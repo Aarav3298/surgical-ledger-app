@@ -7,7 +7,7 @@ from datetime import datetime
 import google.generativeai as genai
 
 # --- SECURE CLOUD API KEY ---
-genai.configure(api_key=st.secrets["AIzaSyDkx3XgUO-uePfoblHpefqv2_tZHRlgUOA"])
+genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
 # ----------------------------
 
 st.set_page_config(page_title="Surgical Ledger V1.6", layout="wide")
