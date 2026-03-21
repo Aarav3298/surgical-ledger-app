@@ -70,7 +70,7 @@ if module == "👨‍⚕️ Module 1: Surgeon Portfolio":
                     """
                     
                     # 2. Call the Model
-                    model = genai.GenerativeModel('gemini-pro')
+                    model = genai.GenerativeModel('gemini-1.5-flash')
                     response = model.generate_content(prompt)
                     
                     # 3. Parse the JSON Output
