@@ -163,9 +163,11 @@ elif module == "💰 Module 2: Revenue Protection":
                 """
                 model = genai.GenerativeModel(MODEL_NAME)
                 response = model.generate_content(prompt)
-               st.success("TPA Audit Rules Applied")
+                
+                st.success("TPA Audit Rules Applied")
                 st.info("### 📋 Copy-Paste Operative Note Addendum:")
                 st.code(response.text, language="markdown")
+                
             except Exception as e:
                 st.error(f"AI Error: {e}")
 
