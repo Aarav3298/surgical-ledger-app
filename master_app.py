@@ -57,45 +57,16 @@ if module == "👨‍⚕️ Module 1: Surgeon Portfolio":
         else:
             with st.spinner("AI evaluating clinical complexity..."):
                 try:
-                    # 1. The Prompt
-                    prompt = f"""
-                    You are an expert surgical auditor. Evaluate the complexity of the following surgical procedure on a scale of 1 to 5.
-                    (1 = Routine/Minor, 3 = Standard/Moderate, 5 = Ultra-Rare/Highly Complex).
+                    # DEBUG MODE: Ask Google what models are actually available
+                    available_models = []
+                    for m in genai.list_models():
+                        if 'generateContent' in m.supported_generation_methods:
+                            available_models.append(m.name)
                     
-                    Procedure: {procedure_name}
-                    Clinical Context/Co-morbidities: {clinical_context}
-                    
-                    Respond ONLY with a valid JSON object in this exact format, nothing else:
-                    {{"score": <number 1-5>, "reasoning": "<1 concise sentence explaining the score>"}}
-                    """
-                    
-                    # 2. Call the Model
-                    model = genai.GenerativeModel('gemini-1.5-flash')
-                    response = model.generate_content(prompt)
-                    
-                    # 3. Parse the JSON Output
-                    import json
-                    result_text = response.text.strip().removeprefix("```json").removesuffix("```").strip()
-                    ai_result = json.loads(result_text)
-                    
-                    # 4. Check Verification Status
-                    verification_status = "🟢 VERIFIED" if audit_ref else "🟡 PENDING AUDIT"
-                    
-                    # 5. Save to our temporary ledger
-                    log_entry = {
-                        "surgeon": surgeon_name,
-                        "procedure": procedure_name,
-                        "context": clinical_context,
-                        "score": ai_result["score"],
-                        "reasoning": ai_result["reasoning"],
-                        "status": verification_status,
-                        "audit_ref": audit_ref
-                    }
-                    st.session_state['surgery_log'].insert(0, log_entry)
-                    st.success("Procedure successfully scored and logged!")
+                    st.warning(f"SYSTEM DIAGNOSTIC - Your valid models are: {available_models}")
                     
                 except Exception as e:
-                    st.error(f"AI Error: {e}")
+                    st.error(f"Diagnostic Error: {e}")
 
     # --- THE SURGEON'S DIGITAL LEDGER ---
     st.markdown("---")
