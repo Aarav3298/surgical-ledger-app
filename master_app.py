@@ -143,7 +143,7 @@ elif module == "💰 Module 2: Revenue Protection":
                     """
                     
                     # 2. Call the Model
-                    model = genai.GenerativeModel('gemini-2.5-flash')
+                    model = genai.GenerativeModel('gemini-3.1-pro-preview')
                     response = model.generate_content(prompt)
                     
                     # 3. Display the Output
