@@ -3,11 +3,25 @@ import pandas as pd
 import google.generativeai as genai
 import altair as alt
 import json
+import re
 
 # --- SECURE CLOUD API KEY ---
 genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
 # Using the advanced reasoning model for complex medical calculations
-MODEL_NAME = 'gemini-2.5-flash' 
+MODEL_NAME = 'gemini-2.5-flash'
+# --- ZERO-PHI MIDDLEWARE (DPDP COMPLIANCE) ---
+def scrub_phi(text):
+    if not text:
+        return text
+    # Redact 10-digit Indian mobile numbers
+    text = re.sub(r'\b\d{10}\b', '[REDACTED_PHONE]', text)
+    # Redact Emails
+    text = re.sub(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,7}\b', '[REDACTED_EMAIL]', text)
+    # Redact Dates (DD/MM/YYYY)
+    text = re.sub(r'\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b', '[REDACTED_DATE]', text)
+    # Redact obvious names following titles (Mr., Mrs., Patient)
+    text = re.sub(r'\b(?:Patient|Mr\.|Mrs\.|Ms\.|Dr\.)\s+[A-Z][a-z]+\b', '[REDACTED_NAME]', text)
+    return text
 
 # --- PAGE CONFIGURATION ---
 st.set_page_config(page_title="Surgical Intelligence Platform", page_icon="⚕️", layout="wide")
@@ -64,7 +78,14 @@ if module == "👨‍⚕️ Module 1: Surgeon Portfolio":
                     You are an elite Chief Medical Officer and Surgical Auditor. Evaluate this procedure and calculate the Advanced Surgical Index (ASI) and global benchmarks.
                     
                     Procedure: {procedure_name}
-                    Clinical Context & Co-morbidities: {clinical_context}
+                    # Run the context through the PII Scrubber before sending to AI
+                    safe_context = scrub_phi(clinical_context)
+                    
+                    prompt = f"""
+                    You are an elite Chief Medical Officer and Surgical Auditor. Evaluate this procedure and calculate the Advanced Surgical Index (ASI) and global benchmarks.
+                    
+                    Procedure: {procedure_name}
+                    Clinical Context & Co-morbidities: {safe_context}
                     
                     Calculate the following strict components:
                     1. baseline: Procedural Difficulty (0.00 to 10.00 scale) for a healthy patient.
