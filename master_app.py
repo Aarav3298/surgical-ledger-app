@@ -7,7 +7,7 @@ import json
 # --- SECURE CLOUD API KEY ---
 genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
 # Using the advanced reasoning model for complex medical calculations
-MODEL_NAME = 'gemini-3.1-pro-preview' 
+MODEL_NAME = 'gemini-2.5-flash' 
 
 # --- PAGE CONFIGURATION ---
 st.set_page_config(page_title="Surgical Intelligence Platform", page_icon="⚕️", layout="wide")
