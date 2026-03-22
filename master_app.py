@@ -40,6 +40,7 @@ if module == "👨‍⚕️ Module 1: Surgeon Portfolio":
     st.info("Log your cases to build an AI-verified record of your clinical capability, time efficiency, and risk-adjusted outcomes.")
 
     with st.form("surgeon_log_form"):
+        st.caption("🔒 **DPDP Compliance Notice:** Do not enter Protected Health Information (PHI) such as patient names, phone numbers, or exact birth dates. Enter strictly de-identified clinical context.")
         col1, col2 = st.columns(2)
         with col1:
             surgeon_name = st.text_input("Surgeon Name / ID")
@@ -162,8 +163,9 @@ elif module == "💰 Module 2: Revenue Protection":
                 """
                 model = genai.GenerativeModel(MODEL_NAME)
                 response = model.generate_content(prompt)
-                st.success("TPA Audit Rules Applied")
-                st.info(response.text)
+               st.success("TPA Audit Rules Applied")
+                st.info("### 📋 Copy-Paste Operative Note Addendum:")
+                st.code(response.text, language="markdown")
             except Exception as e:
                 st.error(f"AI Error: {e}")
 
@@ -178,6 +180,15 @@ elif module == "📊 Module 3: Talent Intelligence":
         st.info("No surgical data available. Log cases in Module 1 to populate the dashboard.")
     else:
         df = pd.DataFrame(st.session_state['surgery_log'])
+        
+        # Generate CSV for Excel export
+        csv = df.to_csv(index=False).encode('utf-8')
+        st.download_button(
+            label="📥 Export Department Data to Excel (CSV)",
+            data=csv,
+            file_name="hospital_surgical_audit.csv",
+            mime="text/csv",
+        )
         
         # AGGREGATE SURGEON DATA
         # 1. Calculate Success Rate (Simplified: 100% if 'None', else subtract baseline risk)
