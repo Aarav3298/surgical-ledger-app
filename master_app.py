@@ -7,8 +7,9 @@ import re
 
 # --- SECURE CLOUD API KEY ---
 genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-# Using the advanced reasoning model for complex medical calculations
-MODEL_NAME = 'gemini-2.5-flash'
+# Using the stable frontier model to prevent quota errors
+MODEL_NAME = 'gemini-2.5-flash' 
+
 # --- ZERO-PHI MIDDLEWARE (DPDP COMPLIANCE) ---
 def scrub_phi(text):
     if not text:
@@ -19,7 +20,7 @@ def scrub_phi(text):
     text = re.sub(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,7}\b', '[REDACTED_EMAIL]', text)
     # Redact Dates (DD/MM/YYYY)
     text = re.sub(r'\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b', '[REDACTED_DATE]', text)
-    # Redact obvious names following titles (Mr., Mrs., Patient)
+    # Redact obvious names following titles
     text = re.sub(r'\b(?:Patient|Mr\.|Mrs\.|Ms\.|Dr\.)\s+[A-Z][a-z]+\b', '[REDACTED_NAME]', text)
     return text
 
@@ -38,7 +39,7 @@ module = st.sidebar.radio(
     ]
 )
 st.sidebar.markdown("---")
-st.sidebar.caption("Surgical Intelligence Platform v3.0 (ASI Engine)")
+st.sidebar.caption("Surgical Intelligence Platform v4.0 (Enterprise)")
 
 # Initialize session state for the ledger
 if 'surgery_log' not in st.session_state:
@@ -46,7 +47,7 @@ if 'surgery_log' not in st.session_state:
 
 
 # ==========================================
-# MODULE 1: SURGEON PORTFOLIO (THE ASI ENGINE)
+# MODULE 1: SURGEON PORTFOLIO
 # ==========================================
 if module == "👨‍⚕️ Module 1: Surgeon Portfolio":
     st.title("👨‍⚕️ Surgeon Portfolio")
@@ -73,11 +74,6 @@ if module == "👨‍⚕️ Module 1: Surgeon Portfolio":
         else:
             with st.spinner("AI evaluating Advanced Surgical Index & Benchmarks..."):
                 try:
-                    # THE "GOD MODE" PROMPT
-                    prompt = f"""
-                    You are an elite Chief Medical Officer and Surgical Auditor. Evaluate this procedure and calculate the Advanced Surgical Index (ASI) and global benchmarks.
-                    
-                    Procedure: {procedure_name}
                     # Run the context through the PII Scrubber before sending to AI
                     safe_context = scrub_phi(clinical_context)
                     
@@ -109,19 +105,16 @@ if module == "👨‍⚕️ Module 1: Surgeon Portfolio":
                     model = genai.GenerativeModel(MODEL_NAME)
                     response = model.generate_content(prompt)
                     
-                    # Parse the advanced JSON Output
                     result_text = response.text.strip().replace("```json", "").replace("```", "").strip()
                     ai_result = json.loads(result_text)
                     
                     verification_status = "🟢 VERIFIED" if audit_ref else "🟡 PENDING AUDIT"
-                    
-                    # Calculate local OT Efficiency ((Benchmark / Actual) * 100)
                     ot_efficiency = round((ai_result["benchmark_time"] / actual_ot_time) * 100, 1)
                     
                     log_entry = {
                         "surgeon": surgeon_name,
                         "procedure": procedure_name,
-                        "context": clinical_context,
+                        "context": safe_context,
                         "actual_time": actual_ot_time,
                         "complications": complications,
                         "baseline": ai_result["baseline"],
@@ -148,14 +141,11 @@ if module == "👨‍⚕️ Module 1: Surgeon Portfolio":
             with st.expander(f"{case['status']} | {case['procedure']} | ASI Score: {case['final_asi']}/15.00"):
                 st.markdown(f"**Surgeon:** {case['surgeon']}")
                 st.markdown(f"**Clinical Context:** {case['context'] if case['context'] else 'None provided'}")
-                
-                # Granular Breakdown metrics
                 col1, col2, col3, col4 = st.columns(4)
                 col1.metric("Baseline ASI", case['baseline'])
                 col2.metric("Context Mod", f"+{case['context_mod']}")
                 col3.metric("Rarity Mod", f"+{case['rarity_mod']}")
                 col4.metric("OT Efficiency", f"{case['ot_efficiency']}%")
-                
                 st.markdown(f"**AI Justification:** {case['reasoning']}")
                 st.markdown(f"*(Global Benchmark Time: {case['benchmark_time']} hrs | Your Time: {case['actual_time']} hrs)*")
     else:
@@ -193,7 +183,7 @@ elif module == "💰 Module 2: Revenue Protection":
                 st.error(f"AI Error: {e}")
 
 # ==========================================
-# MODULE 3: TALENT INTELLIGENCE (CIS DASHBOARD)
+# MODULE 3: TALENT INTELLIGENCE
 # ==========================================
 elif module == "📊 Module 3: Talent Intelligence":
     st.title("📊 Clinical Governance Executive Dashboard")
@@ -218,7 +208,6 @@ elif module == "📊 Module 3: Talent Intelligence":
         )
         
         # AGGREGATE SURGEON DATA
-        # 1. Calculate Success Rate (Simplified: 100% if 'None', else subtract baseline risk)
         df['success_rate'] = df.apply(lambda row: 100 if str(row['complications']).strip().lower() in ['none', ''] else max(0, 100 - row['expected_risk'] - 15), axis=1)
         
         surgeon_stats = df.groupby('surgeon').agg(
@@ -228,8 +217,6 @@ elif module == "📊 Module 3: Talent Intelligence":
             Avg_Success=('success_rate', 'mean')
         ).reset_index()
         
-        # Calculate Clinical Impact Score (CIS) for each surgeon
-        # Weights: Success(40%), ASI/Complexity Volume (25%), Efficiency(20%), Raw Volume (15%)
         max_cases = surgeon_stats['Total_Cases'].max() if surgeon_stats['Total_Cases'].max() > 0 else 1
         surgeon_stats['CIS'] = (
             (surgeon_stats['Avg_Success'] * 0.40) + 
@@ -238,12 +225,10 @@ elif module == "📊 Module 3: Talent Intelligence":
             ((surgeon_stats['Total_Cases'] / max_cases) * 100 * 0.15)
         ).round(1)
 
-        # SELECT SURGEON TO REVIEW
         st.markdown("---")
         selected_surgeon = st.selectbox("Select Surgeon to Review:", surgeon_stats['surgeon'].tolist())
         s_data = surgeon_stats[surgeon_stats['surgeon'] == selected_surgeon].iloc[0]
 
-        # 1. KPI CARDS
         st.subheader(f"Performance Scorecard: Dr. {selected_surgeon}")
         col1, col2, col3, col4 = st.columns(4)
         col1.metric("Clinical Impact Score (CIS)", f"{s_data['CIS']}/100")
@@ -251,7 +236,6 @@ elif module == "📊 Module 3: Talent Intelligence":
         col3.metric("OT Efficiency", f"{round(s_data['Avg_Efficiency'], 1)}%")
         col4.metric("Risk-Adjusted Success", f"{round(s_data['Avg_Success'], 1)}%")
 
-        # 2. THE VISUALIZATION (ASI vs Efficiency)
         st.markdown("---")
         st.subheader("Departmental Benchmark Matrix")
         chart = alt.Chart(surgeon_stats).mark_circle().encode(
@@ -263,7 +247,6 @@ elif module == "📊 Module 3: Talent Intelligence":
         ).properties(height=400)
         st.altair_chart(chart, use_container_width=True)
 
-        # 3. AI PERSONA GENERATOR (The Decision Tree)
         st.markdown("---")
         st.subheader("AI CMO Summary & Recommendation")
         
