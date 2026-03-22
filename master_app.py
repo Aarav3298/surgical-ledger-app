@@ -117,11 +117,42 @@ if module == "👨‍⚕️ Module 1: Surgeon Portfolio":
 elif module == "💰 Module 2: Revenue Protection":
     st.title("💰 Pre-Submission Intelligence")
     st.markdown("### Stop Insurance Rejections Before They Happen.")
-    st.warning("AI will analyze operative notes to generate a mandatory billing checklist, preventing revenue leakage from undercoded complex surgeries.")
-    
-    # We will build the Gemini API prompt for insurance here!
-    st.write("*(Insurance checklist generator coming soon...)*")
+    st.warning("AI generates mandatory billing checklists to prevent revenue leakage from undercoded or poorly documented complex surgeries.")
 
+    with st.form("revenue_form"):
+        st.subheader("Generate Operative Note Checklist")
+        procedure_to_check = st.text_input("Planned Procedure", placeholder="e.g., Total Knee Arthroplasty (Bilateral) or Radical Mastectomy")
+        
+        generate_checklist = st.form_submit_button("Generate TPA Compliance Checklist")
+
+    if generate_checklist:
+        if not procedure_to_check:
+            st.error("Please enter a procedure name.")
+        else:
+            with st.spinner("Analyzing TPA documentation requirements..."):
+                try:
+                    # 1. The Prompt (Acting as an Indian Insurance Auditor)
+                    prompt = f"""
+                    You are a veteran Medical Biller and Insurance Auditor specializing in the Indian private hospital and TPA (Third Party Administrator) landscape. 
+                    
+                    A surgeon is about to write the operative notes for: {procedure_to_check}.
+                    
+                    To prevent claim rejection or undercoding, what are the top 3 to 5 specific, critical anatomical or procedural details that MUST be explicitly documented in the operative notes? 
+                    
+                    Provide the response as a clear, concise, bulleted checklist. Do not include introductory fluff. Just the actionable checklist.
+                    """
+                    
+                    # 2. Call the Model
+                    model = genai.GenerativeModel('gemini-2.5-flash')
+                    response = model.generate_content(prompt)
+                    
+                    # 3. Display the Output
+                    st.success("TPA Audit Rules Applied")
+                    st.markdown("### 📋 Required Op-Note Documentation:")
+                    st.info(response.text)
+                    
+                except Exception as e:
+                    st.error(f"AI Error: {e}")
 # ==========================================
 # MODULE 3: TALENT INTELLIGENCE
 # ==========================================
