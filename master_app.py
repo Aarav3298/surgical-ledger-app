@@ -184,7 +184,7 @@ elif module == "📊 Module 3: Talent Intelligence":
         df = pd.DataFrame(st.session_state['surgery_log'])
         
         # Generate CSV for Excel export
-        csv = df.to_csv(index=False).encode('utf-8')
+        csv = df.to_csv(index=False).encode('utf-8-sig')
         st.download_button(
             label="📥 Export Department Data to Excel (CSV)",
             data=csv,
