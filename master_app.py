@@ -160,6 +160,52 @@ elif module == "📊 Module 3: Talent Intelligence":
     st.title("📊 Clinical Governance & OT Allocation")
     st.markdown("### Strategic Resource Management for Administrators.")
     st.success("Identify your highest-complexity surgeons for priority OT allocation and retention tracking.")
-    
-    # We will move your Altair graphs here!
-    st.write("*(Complexity trend graphs coming soon...)*")
+
+    # Check if there is data to display
+    if 'surgery_log' not in st.session_state or len(st.session_state['surgery_log']) == 0:
+        st.info("No surgical data available yet. Have your surgeons log cases in Module 1 to populate this dashboard.")
+    else:
+        # Convert the ledger into a Pandas DataFrame for analysis
+        df = pd.DataFrame(st.session_state['surgery_log'])
+        
+        # --- TOP LEVEL METRICS ---
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("Total Cases Logged", len(df))
+        with col2:
+            st.metric("Avg Hospital Complexity", round(df['score'].mean(), 1))
+        with col3:
+            verified_cases = len(df[df['status'] == "🟢 VERIFIED"])
+            st.metric("Verified Audit Rate", f"{int((verified_cases/len(df))*100)}%")
+
+        st.markdown("---")
+        
+        # --- THE ALTAIR VISUALIZATION ---
+        st.subheader("Surgeon Complexity Matrix")
+        
+        # Group the data by surgeon to get their average score and total volume
+        surgeon_stats = df.groupby('surgeon').agg(
+            Avg_Complexity=('score', 'mean'),
+            Total_Cases=('procedure', 'count')
+        ).reset_index()
+
+        # Build a scatter plot showing Volume vs. Complexity
+        chart = alt.Chart(surgeon_stats).mark_circle(size=600).encode(
+            x=alt.X('Total_Cases', title='Total Cases Performed', axis=alt.Axis(tickMinStep=1)),
+            y=alt.Y('Avg_Complexity', title='Average Complexity Score (1-5)', scale=alt.Scale(domain=[0, 5.5])),
+            color=alt.Color('surgeon', legend=alt.Legend(title="Surgeon")),
+            tooltip=['surgeon', 'Total_Cases', 'Avg_Complexity']
+        ).properties(height=400, title="Volume vs. Surgical Complexity")
+        
+        st.altair_chart(chart, use_container_width=True)
+
+        # --- AI STRATEGIC ALERTS ---
+        st.subheader("Strategic OT Allocation Alerts")
+        
+        # Find the surgeon with the highest average complexity
+        top_surgeon = surgeon_stats.loc[surgeon_stats['Avg_Complexity'].idxmax()]
+        
+        if top_surgeon['Avg_Complexity'] >= 3.5:
+            st.warning(f"🏆 **High-Value Talent Detected:** Dr. {top_surgeon['surgeon']} is operating at an elite complexity level ({round(top_surgeon['Avg_Complexity'], 1)}/5). \n\n**Recommendation:** Prioritize main OT scheduling for this unit to maximize tertiary care revenue and retain top talent.")
+        else:
+            st.info("Log more Level 4 and 5 cases to generate AI-driven OT allocation recommendations.")
