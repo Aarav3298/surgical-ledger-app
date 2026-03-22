@@ -2,9 +2,12 @@ import streamlit as st
 import pandas as pd
 import google.generativeai as genai
 import altair as alt
+import json
 
 # --- SECURE CLOUD API KEY ---
 genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+# Using the advanced reasoning model for complex medical calculations
+MODEL_NAME = 'gemini-3.1-pro-preview' 
 
 # --- PAGE CONFIGURATION ---
 st.set_page_config(page_title="Surgical Intelligence Platform", page_icon="⚕️", layout="wide")
@@ -21,191 +24,218 @@ module = st.sidebar.radio(
     ]
 )
 st.sidebar.markdown("---")
-st.sidebar.caption("Surgical Intelligence Platform v2.0")
+st.sidebar.caption("Surgical Intelligence Platform v3.0 (ASI Engine)")
+
+# Initialize session state for the ledger
+if 'surgery_log' not in st.session_state:
+    st.session_state['surgery_log'] = []
+
 
 # ==========================================
-# MODULE 1: SURGEON PORTFOLIO
+# MODULE 1: SURGEON PORTFOLIO (THE ASI ENGINE)
 # ==========================================
 if module == "👨‍⚕️ Module 1: Surgeon Portfolio":
     st.title("👨‍⚕️ Surgeon Portfolio")
-    st.markdown("### Your Clinical Capability. Mathematically Verified.")
-    st.info("Log your cases here to build a portable, AI-verified record of your surgical complexity.")
+    st.markdown("### The Advanced Surgical Index (ASI). Mathematically Verified.")
+    st.info("Log your cases to build an AI-verified record of your clinical capability, time efficiency, and risk-adjusted outcomes.")
 
-    # Initialize a temporary session state ledger if it doesn't exist
-    if 'surgery_log' not in st.session_state:
-        st.session_state['surgery_log'] = []
-
-    # --- THE DATA ENTRY FORM ---
     with st.form("surgeon_log_form"):
-        st.subheader("Log a New Procedure")
+        col1, col2 = st.columns(2)
+        with col1:
+            surgeon_name = st.text_input("Surgeon Name / ID")
+            procedure_name = st.text_input("Primary Procedure Name", placeholder="e.g., Whipple Procedure")
+            actual_ot_time = st.number_input("Actual OT Time (Hours)", min_value=0.5, max_value=24.0, step=0.5, value=2.0)
+        with col2:
+            clinical_context = st.text_area("Clinical Context & Co-morbidities", placeholder="Patient demographics, abnormal anatomy, adhesions...", height=115)
+            complications = st.text_input("Complications Noted", placeholder="Type 'None' or describe (e.g., minor hemorrhage)")
         
-        surgeon_name = st.text_input("Surgeon Name / ID")
-        procedure_name = st.text_input("Primary Procedure Name", placeholder="e.g., Laparoscopic Cholecystectomy")
-        
-        # This is the "Clinical Defensibility" fix Claude asked for
-        clinical_context = st.text_area("Clinical Context & Co-morbidities", placeholder="e.g., 72-year-old diabetic, severe scarring, frozen Calot's triangle...")
-        
-        # This is the anti-fraud verification fix
         audit_ref = st.text_input("Audit Reference (Hospital Invoice No. or TPA Claim ID)", placeholder="Leave blank if pending...")
-        
-        submit_button = st.form_submit_button("Generate AI Complexity Score & Log")
+        submit_button = st.form_submit_button("Generate ASI Score & Log Case")
 
-    # --- THE AI ENGINE ---
     if submit_button:
         if not procedure_name or not surgeon_name:
             st.error("Please enter both your Name and the Procedure Name.")
         else:
-            with st.spinner("AI evaluating clinical complexity..."):
+            with st.spinner("AI evaluating Advanced Surgical Index & Benchmarks..."):
                 try:
-                    # 1. The Prompt
+                    # THE "GOD MODE" PROMPT
                     prompt = f"""
-                    You are an expert surgical auditor. Evaluate the complexity of the following surgical procedure on a scale of 1 to 5.
-                    (1 = Routine/Minor, 3 = Standard/Moderate, 5 = Ultra-Rare/Highly Complex).
+                    You are an elite Chief Medical Officer and Surgical Auditor. Evaluate this procedure and calculate the Advanced Surgical Index (ASI) and global benchmarks.
                     
                     Procedure: {procedure_name}
-                    Clinical Context/Co-morbidities: {clinical_context}
+                    Clinical Context & Co-morbidities: {clinical_context}
                     
-                    Respond ONLY with a valid JSON object in this exact format, nothing else:
-                    {{"score": <number 1-5>, "reasoning": "<1 concise sentence explaining the score>"}}
+                    Calculate the following strict components:
+                    1. baseline: Procedural Difficulty (0.00 to 10.00 scale) for a healthy patient.
+                    2. context_modifier: Add +0.00 to +3.00 based on the provided clinical context.
+                    3. rarity_modifier: Add +0.00 to +2.00 if the procedure/findings are highly unusual.
+                    4. benchmark_time: The global standard average OT time in hours for this procedure (float).
+                    5. expected_complication_rate: The baseline statistical percentage risk of complications for this procedure (float, e.g., 5.5).
+                    
+                    Respond ONLY with a valid JSON object in this exact format:
+                    {{
+                        "baseline": <float>,
+                        "context_modifier": <float>,
+                        "rarity_modifier": <float>,
+                        "final_asi_score": <float, max 15.00>,
+                        "benchmark_time": <float>,
+                        "expected_complication_rate": <float>,
+                        "clinical_justification": "<1 concise sentence explaining the modifiers>"
+                    }}
                     """
                     
-                    # 2. Call the Model (USING THE VALID 2.5 FLASH MODEL!)
-                    model = genai.GenerativeModel('gemini-2.5-flash')
+                    model = genai.GenerativeModel(MODEL_NAME)
                     response = model.generate_content(prompt)
                     
-                    # 3. Parse the JSON Output
-                    import json
-                    result_text = response.text.strip().removeprefix("```json").removesuffix("```").strip()
+                    # Parse the advanced JSON Output
+                    result_text = response.text.strip().replace("```json", "").replace("```", "").strip()
                     ai_result = json.loads(result_text)
                     
-                    # 4. Check Verification Status
                     verification_status = "🟢 VERIFIED" if audit_ref else "🟡 PENDING AUDIT"
                     
-                    # 5. Save to our temporary ledger
+                    # Calculate local OT Efficiency ((Benchmark / Actual) * 100)
+                    ot_efficiency = round((ai_result["benchmark_time"] / actual_ot_time) * 100, 1)
+                    
                     log_entry = {
                         "surgeon": surgeon_name,
                         "procedure": procedure_name,
                         "context": clinical_context,
-                        "score": ai_result["score"],
-                        "reasoning": ai_result["reasoning"],
-                        "status": verification_status,
-                        "audit_ref": audit_ref
+                        "actual_time": actual_ot_time,
+                        "complications": complications,
+                        "baseline": ai_result["baseline"],
+                        "context_mod": ai_result["context_modifier"],
+                        "rarity_mod": ai_result["rarity_modifier"],
+                        "final_asi": ai_result["final_asi_score"],
+                        "benchmark_time": ai_result["benchmark_time"],
+                        "expected_risk": ai_result["expected_complication_rate"],
+                        "ot_efficiency": ot_efficiency,
+                        "reasoning": ai_result["clinical_justification"],
+                        "status": verification_status
                     }
                     st.session_state['surgery_log'].insert(0, log_entry)
-                    st.success("Procedure successfully scored and logged!")
+                    st.success(f"Case Logged! Final ASI: {ai_result['final_asi_score']}/15.00 | OT Efficiency: {ot_efficiency}%")
                     
                 except Exception as e:
-                    st.error(f"AI Error: {e}")
+                    st.error(f"AI Calculation Error: {e}. Please try again.")
 
-    # --- THE SURGEON'S DIGITAL LEDGER ---
+    # THE SURGEON'S GRANULAR LEDGER
     st.markdown("---")
-    st.subheader("Your Case Ledger")
-    
+    st.subheader("Your Verified Case Ledger")
     if st.session_state['surgery_log']:
         for case in st.session_state['surgery_log']:
-            with st.expander(f"{case['status']} | {case['procedure']} | Score: {case['score']}/5"):
-                st.write(f"**Surgeon:** {case['surgeon']}")
-                st.write(f"**Context Added:** {case['context'] if case['context'] else 'None'}")
-                st.write(f"**AI Reasoning:** {case['reasoning']}")
-                st.write(f"**Audit/Billing Ref:** {case['audit_ref'] if case['audit_ref'] else 'Not Provided'}")
+            with st.expander(f"{case['status']} | {case['procedure']} | ASI Score: {case['final_asi']}/15.00"):
+                st.markdown(f"**Surgeon:** {case['surgeon']}")
+                st.markdown(f"**Clinical Context:** {case['context'] if case['context'] else 'None provided'}")
+                
+                # Granular Breakdown metrics
+                col1, col2, col3, col4 = st.columns(4)
+                col1.metric("Baseline ASI", case['baseline'])
+                col2.metric("Context Mod", f"+{case['context_mod']}")
+                col3.metric("Rarity Mod", f"+{case['rarity_mod']}")
+                col4.metric("OT Efficiency", f"{case['ot_efficiency']}%")
+                
+                st.markdown(f"**AI Justification:** {case['reasoning']}")
+                st.markdown(f"*(Global Benchmark Time: {case['benchmark_time']} hrs | Your Time: {case['actual_time']} hrs)*")
     else:
-        st.caption("No cases logged yet. Enter a procedure above to see your AI score.")
+        st.caption("No cases logged yet.")
 
 # ==========================================
-# MODULE 2: REVENUE PROTECTION
+# MODULE 2: REVENUE PROTECTION 
 # ==========================================
 elif module == "💰 Module 2: Revenue Protection":
     st.title("💰 Pre-Submission Intelligence")
     st.markdown("### Stop Insurance Rejections Before They Happen.")
-    st.warning("AI generates mandatory billing checklists to prevent revenue leakage from undercoded or poorly documented complex surgeries.")
+    st.warning("AI generates mandatory billing checklists to prevent revenue leakage from undercoded complex surgeries.")
 
     with st.form("revenue_form"):
-        st.subheader("Generate Operative Note Checklist")
-        procedure_to_check = st.text_input("Planned Procedure", placeholder="e.g., Total Knee Arthroplasty (Bilateral) or Radical Mastectomy")
-        
+        procedure_to_check = st.text_input("Planned Procedure", placeholder="e.g., Total Knee Arthroplasty (Bilateral)")
         generate_checklist = st.form_submit_button("Generate TPA Compliance Checklist")
 
-    if generate_checklist:
-        if not procedure_to_check:
-            st.error("Please enter a procedure name.")
-        else:
-            with st.spinner("Analyzing TPA documentation requirements..."):
-                try:
-                    # 1. The Prompt (Acting as an Indian Insurance Auditor)
-                    prompt = f"""
-                    You are a veteran Medical Biller and Insurance Auditor specializing in the Indian private hospital and TPA (Third Party Administrator) landscape. 
-                    
-                    A surgeon is about to write the operative notes for: {procedure_to_check}.
-                    
-                    To prevent claim rejection or undercoding, what are the top 3 to 5 specific, critical anatomical or procedural details that MUST be explicitly documented in the operative notes? 
-                    
-                    Provide the response as a clear, concise, bulleted checklist. Do not include introductory fluff. Just the actionable checklist.
-                    """
-                    
-                    # 2. Call the Model
-                    model = genai.GenerativeModel('gemini-3.1-pro-preview')
-                    response = model.generate_content(prompt)
-                    
-                    # 3. Display the Output
-                    st.success("TPA Audit Rules Applied")
-                    st.markdown("### 📋 Required Op-Note Documentation:")
-                    st.info(response.text)
-                    
-                except Exception as e:
-                    st.error(f"AI Error: {e}")
+    if generate_checklist and procedure_to_check:
+        with st.spinner("Analyzing TPA documentation requirements..."):
+            try:
+                prompt = f"""
+                You are a veteran Medical Biller specializing in the Indian private hospital and TPA landscape. 
+                A surgeon is about to write the operative notes for: {procedure_to_check}.
+                What are the top 3-5 specific anatomical or procedural details that MUST be explicitly documented to prevent claim rejection or downcoding? 
+                Provide a clear, bulleted checklist only.
+                """
+                model = genai.GenerativeModel(MODEL_NAME)
+                response = model.generate_content(prompt)
+                st.success("TPA Audit Rules Applied")
+                st.info(response.text)
+            except Exception as e:
+                st.error(f"AI Error: {e}")
+
 # ==========================================
-# MODULE 3: TALENT INTELLIGENCE
+# MODULE 3: TALENT INTELLIGENCE (CIS DASHBOARD)
 # ==========================================
 elif module == "📊 Module 3: Talent Intelligence":
-    st.title("📊 Clinical Governance & OT Allocation")
-    st.markdown("### Strategic Resource Management for Administrators.")
-    st.success("Identify your highest-complexity surgeons for priority OT allocation and retention tracking.")
+    st.title("📊 Clinical Governance Executive Dashboard")
+    st.markdown("### Risk-Adjusted Surgical Optimization")
 
-    # Check if there is data to display
     if 'surgery_log' not in st.session_state or len(st.session_state['surgery_log']) == 0:
-        st.info("No surgical data available yet. Have your surgeons log cases in Module 1 to populate this dashboard.")
+        st.info("No surgical data available. Log cases in Module 1 to populate the dashboard.")
     else:
-        # Convert the ledger into a Pandas DataFrame for analysis
         df = pd.DataFrame(st.session_state['surgery_log'])
         
-        # --- TOP LEVEL METRICS ---
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.metric("Total Cases Logged", len(df))
-        with col2:
-            st.metric("Avg Hospital Complexity", round(df['score'].mean(), 1))
-        with col3:
-            verified_cases = len(df[df['status'] == "🟢 VERIFIED"])
-            st.metric("Verified Audit Rate", f"{int((verified_cases/len(df))*100)}%")
-
-        st.markdown("---")
+        # AGGREGATE SURGEON DATA
+        # 1. Calculate Success Rate (Simplified: 100% if 'None', else subtract baseline risk)
+        df['success_rate'] = df.apply(lambda row: 100 if str(row['complications']).strip().lower() in ['none', ''] else max(0, 100 - row['expected_risk'] - 15), axis=1)
         
-        # --- THE ALTAIR VISUALIZATION ---
-        st.subheader("Surgeon Complexity Matrix")
-        
-        # Group the data by surgeon to get their average score and total volume
         surgeon_stats = df.groupby('surgeon').agg(
-            Avg_Complexity=('score', 'mean'),
-            Total_Cases=('procedure', 'count')
+            Total_Cases=('procedure', 'count'),
+            Avg_ASI=('final_asi', 'mean'),
+            Avg_Efficiency=('ot_efficiency', 'mean'),
+            Avg_Success=('success_rate', 'mean')
         ).reset_index()
-
-        # Build a scatter plot showing Volume vs. Complexity
-        chart = alt.Chart(surgeon_stats).mark_circle(size=600).encode(
-            x=alt.X('Total_Cases', title='Total Cases Performed', axis=alt.Axis(tickMinStep=1)),
-            y=alt.Y('Avg_Complexity', title='Average Complexity Score (1-5)', scale=alt.Scale(domain=[0, 5.5])),
-            color=alt.Color('surgeon', legend=alt.Legend(title="Surgeon")),
-            tooltip=['surgeon', 'Total_Cases', 'Avg_Complexity']
-        ).properties(height=400, title="Volume vs. Surgical Complexity")
         
+        # Calculate Clinical Impact Score (CIS) for each surgeon
+        # Weights: Success(40%), ASI/Complexity Volume (25%), Efficiency(20%), Raw Volume (15%)
+        max_cases = surgeon_stats['Total_Cases'].max() if surgeon_stats['Total_Cases'].max() > 0 else 1
+        surgeon_stats['CIS'] = (
+            (surgeon_stats['Avg_Success'] * 0.40) + 
+            ((surgeon_stats['Avg_ASI'] / 15.0) * 100 * 0.25) + 
+            (surgeon_stats['Avg_Efficiency'].clip(upper=150) * 0.20) + 
+            ((surgeon_stats['Total_Cases'] / max_cases) * 100 * 0.15)
+        ).round(1)
+
+        # SELECT SURGEON TO REVIEW
+        st.markdown("---")
+        selected_surgeon = st.selectbox("Select Surgeon to Review:", surgeon_stats['surgeon'].tolist())
+        s_data = surgeon_stats[surgeon_stats['surgeon'] == selected_surgeon].iloc[0]
+
+        # 1. KPI CARDS
+        st.subheader(f"Performance Scorecard: Dr. {selected_surgeon}")
+        col1, col2, col3, col4 = st.columns(4)
+        col1.metric("Clinical Impact Score (CIS)", f"{s_data['CIS']}/100")
+        col2.metric("Avg ASI (Complexity)", f"{round(s_data['Avg_ASI'], 2)}/15")
+        col3.metric("OT Efficiency", f"{round(s_data['Avg_Efficiency'], 1)}%")
+        col4.metric("Risk-Adjusted Success", f"{round(s_data['Avg_Success'], 1)}%")
+
+        # 2. THE VISUALIZATION (ASI vs Efficiency)
+        st.markdown("---")
+        st.subheader("Departmental Benchmark Matrix")
+        chart = alt.Chart(surgeon_stats).mark_circle().encode(
+            x=alt.X('Avg_Efficiency', title='OT Efficiency % (Time vs Benchmark)', scale=alt.Scale(zero=False)),
+            y=alt.Y('Avg_ASI', title='Average ASI Score (Complexity)', scale=alt.Scale(domain=[0, 15])),
+            size=alt.Size('Total_Cases', title='Case Volume', scale=alt.Scale(range=[200, 1000])),
+            color=alt.Color('surgeon', legend=alt.Legend(title="Surgeon")),
+            tooltip=['surgeon', 'CIS', 'Avg_ASI', 'Avg_Efficiency', 'Total_Cases']
+        ).properties(height=400)
         st.altair_chart(chart, use_container_width=True)
 
-        # --- AI STRATEGIC ALERTS ---
-        st.subheader("Strategic OT Allocation Alerts")
+        # 3. AI PERSONA GENERATOR (The Decision Tree)
+        st.markdown("---")
+        st.subheader("AI CMO Summary & Recommendation")
         
-        # Find the surgeon with the highest average complexity
-        top_surgeon = surgeon_stats.loc[surgeon_stats['Avg_Complexity'].idxmax()]
-        
-        if top_surgeon['Avg_Complexity'] >= 3.5:
-            st.warning(f"🏆 **High-Value Talent Detected:** Dr. {top_surgeon['surgeon']} is operating at an elite complexity level ({round(top_surgeon['Avg_Complexity'], 1)}/5). \n\n**Recommendation:** Prioritize main OT scheduling for this unit to maximize tertiary care revenue and retain top talent.")
+        if s_data['Avg_Success'] < 80:
+            st.error("🚨 **URGENT REVIEW (Liability Risk):** Risk-adjusted outcomes are below acceptable clinical thresholds regardless of surgical volume. Immediate case audit recommended.")
+        elif s_data['Avg_ASI'] > 9.0 and s_data['Avg_Success'] >= 90:
+            st.success("🏆 **ELITE ANCHOR:** This surgeon is a cornerstone of the department, handling the highest complexity (Level 4/5 equivalent) cases with excellent outcomes. Prioritize retention and prime OT scheduling.")
+        elif s_data['Avg_Efficiency'] > 110 and s_data['Avg_ASI'] < 7.0:
+            st.info("⚡ **HIGH-YIELD WORKHORSE:** Exceptional operational efficiency on standard-complexity cases. Highly profitable for the hospital due to rapid OT turnover. Maximize daily case loads.")
+        elif s_data['CIS'] >= 85:
+            st.success("⭐ **TOP TIER PERFORMER:** Outstanding balance of complexity, speed, and safety. A highly valuable asset to the surgical department.")
         else:
-            st.info("Log more Level 4 and 5 cases to generate AI-driven OT allocation recommendations.")
+            st.warning("📊 **STEADY PERFORMER:** Solid clinical metrics across standard departmental volume. Monitor for opportunities to increase complex case exposure or improve OT turnaround times.")
