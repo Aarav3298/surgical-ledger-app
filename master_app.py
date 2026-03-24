@@ -15,6 +15,9 @@ view = st.sidebar.radio("Select Portal:", ["Surgeon Portal", "Admin Console"])
 # ==========================================
 # PORTAL 1: SURGEON VIEW (The "Verified Resume")
 # ==========================================
+# ==========================================
+# PORTAL 1: SURGEON VIEW (The "Verified Resume")
+# ==========================================
 if view == "Surgeon Portal":
     st.title("Surgeon Portal: Log Procedure")
     st.markdown("Enter procedure details and upload the billing invoice for verification.")
@@ -26,14 +29,13 @@ if view == "Surgeon Portal":
         st.divider()
         
         st.subheader("2. Clinical Details")
-        # Reverting to the exact original clean layout
         surgeon_name = st.text_input("Surgeon Name", placeholder="Dr. First Last")
         procedure_name = st.text_input("Procedure Name", placeholder="e.g., Laparoscopic Cholecystectomy")
         
-        # Original metrics required for the AI calculation
         actual_ot_time = st.number_input("Actual OT Time (minutes)", min_value=0, step=15)
         
-        clinical_context = st.text_area("Clinical Context / Patient State", placeholder="Describe patient comorbidities, BMI, previous surgeries, etc.")
+        # CHANGED: Replaced "Clinical Context" with a direct "Clinical Comorbidity" field
+        clinical_comorbidity = st.text_area("Clinical Comorbidity", placeholder="e.g., Severe Diabetes, Hypertension, existing cardiac history")
         complications = st.text_area("Complications (If any)", placeholder="Describe any intra-op or post-op complications, blood loss, etc.")
         
         st.divider()
@@ -44,17 +46,16 @@ if view == "Surgeon Portal":
         submit_button = st.form_submit_button(label="Log & Verify Procedure", use_container_width=True)
 
     if submit_button:
-        # The system forces them to upload a file AND enter the manual ID
         if uploaded_file is not None and surgeon_name and procedure_name and audit_reference:
             
-            # Placeholder for the Gemini 2.5 Flash ASI calculation we built earlier
+            # Placeholder for the Gemini 2.5 Flash ASI calculation
             mock_complexity_score = 4.5 
             
             new_entry = {
                 "Surgeon": surgeon_name,
                 "Procedure": procedure_name,
                 "OT Time": actual_ot_time,
-                "Clinical Context": clinical_context,
+                "Comorbidities": clinical_comorbidity if clinical_comorbidity else "None", # UPDATED VARIABLE
                 "Complications": complications if complications else "None",
                 "Complexity_Score": mock_complexity_score,
                 "Audit_ID": audit_reference,
@@ -65,13 +66,12 @@ if view == "Surgeon Portal":
         else:
             st.error("Submission Failed: You must attach the PDF proof and fill out the Surgeon, Procedure, and Audit ID fields.")
 
-    # Show the Surgeon's current verified stats
     if st.session_state.procedures:
         st.divider()
         st.subheader("Your Verified Portfolio")
         df_surgeon = pd.DataFrame(st.session_state.procedures)
-        # Reordering columns to match the old clean view
-        st.dataframe(df_surgeon[["Status", "Audit_ID", "Surgeon", "Procedure", "Complexity_Score", "OT Time", "Clinical Context", "Complications"]], use_container_width=True)
+        # UPDATED TO SHOW "Comorbidities" IN THE TABLE
+        st.dataframe(df_surgeon[["Status", "Audit_ID", "Surgeon", "Procedure", "Complexity_Score", "OT Time", "Comorbidities", "Complications"]], use_container_width=True)
 
 # ==========================================
 # PORTAL 2: ADMIN CONSOLE (The "Truth Engine")
