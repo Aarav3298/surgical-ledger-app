@@ -21,50 +21,57 @@ if view == "Surgeon Portal":
 
     with st.form("log_procedure_form"):
         st.subheader("1. Mandatory Proof")
-        # The file uploader is just for attachment/audit purposes now
-        uploaded_file = st.file_uploader("Attach Hospital Invoice / Claim PDF (Required for Verification)", type=["pdf", "png", "jpg"])
+        uploaded_file = st.file_uploader("Attach Hospital Invoice / Claim PDF (Required for Verification)", type=["pdf", "png", "jpg", "jpeg"])
+        
+        st.divider()
         
         st.subheader("2. Clinical Details")
-        col1, col2 = st.columns(2)
-        with col1:
-            surgeon_name = st.text_input("Primary Surgeon Name")
-            procedure_name = st.text_input("Procedure Performed")
-            audit_id = st.text_input("Invoice / Claim ID (Type manually)")
-        with col2:
-            date_performed = st.date_input("Date of Procedure")
-            comorbidities = st.multiselect("Patient Comorbidities (Select all that apply)", 
-                                           ["None", "Diabetes", "Hypertension", "Obesity", "Cardiac Disease", "Renal Issue"])
-            complications = st.text_area("Intra-op Complications / Blood Loss (If any)")
+        # Reverting to the exact original clean layout
+        surgeon_name = st.text_input("Surgeon Name", placeholder="Dr. First Last")
+        procedure_name = st.text_input("Procedure Name", placeholder="e.g., Laparoscopic Cholecystectomy")
+        
+        # Original metrics required for the AI calculation
+        actual_ot_time = st.number_input("Actual OT Time (minutes)", min_value=0, step=15)
+        
+        clinical_context = st.text_area("Clinical Context / Patient State", placeholder="Describe patient comorbidities, BMI, previous surgeries, etc.")
+        complications = st.text_area("Complications (If any)", placeholder="Describe any intra-op or post-op complications, blood loss, etc.")
+        
+        st.divider()
+        
+        st.subheader("3. Audit Trail")
+        audit_reference = st.text_input("Audit Reference (Invoice / Claim ID)", placeholder="Enter the exact ID from the uploaded document")
 
-        submit_button = st.form_submit_button(label="Log & Verify Procedure")
+        submit_button = st.form_submit_button(label="Log & Verify Procedure", use_container_width=True)
 
     if submit_button:
         # The system forces them to upload a file AND enter the manual ID
-        if uploaded_file is not None and surgeon_name and procedure_name and audit_id:
+        if uploaded_file is not None and surgeon_name and procedure_name and audit_reference:
             
-            # Placeholder for the Gemini API that will read these text fields and return a score
-            mock_complexity_score = 4 
+            # Placeholder for the Gemini 2.5 Flash ASI calculation we built earlier
+            mock_complexity_score = 4.5 
             
             new_entry = {
                 "Surgeon": surgeon_name,
                 "Procedure": procedure_name,
-                "Date": date_performed,
-                "Comorbidities": ", ".join(comorbidities) if comorbidities else "None",
+                "OT Time": actual_ot_time,
+                "Clinical Context": clinical_context,
+                "Complications": complications if complications else "None",
                 "Complexity_Score": mock_complexity_score,
-                "Audit_ID": audit_id,
-                "Proof_Attached": "Yes"
+                "Audit_ID": audit_reference,
+                "Status": "VERIFIED ✅"
             }
             st.session_state.procedures.append(new_entry)
-            st.success(f"Procedure Logged! Linked to Audit ID: {audit_id}")
+            st.success(f"Procedure Logged! Linked to Audit ID: {audit_reference}")
         else:
-            st.error("Submission Failed: You must attach the PDF proof and fill out all mandatory fields.")
+            st.error("Submission Failed: You must attach the PDF proof and fill out the Surgeon, Procedure, and Audit ID fields.")
 
     # Show the Surgeon's current verified stats
     if st.session_state.procedures:
         st.divider()
         st.subheader("Your Verified Portfolio")
         df_surgeon = pd.DataFrame(st.session_state.procedures)
-        st.dataframe(df_surgeon, use_container_width=True)
+        # Reordering columns to match the old clean view
+        st.dataframe(df_surgeon[["Status", "Audit_ID", "Surgeon", "Procedure", "Complexity_Score", "OT Time", "Clinical Context", "Complications"]], use_container_width=True)
 
 # ==========================================
 # PORTAL 2: ADMIN CONSOLE (The "Truth Engine")
@@ -89,6 +96,6 @@ elif view == "Admin Console":
         with col2:
             st.subheader("Raw Verified Ledger (Ready for Audit)")
             # Admins can see the exact Audit IDs to pull the physical files if they suspect cheating
-            st.dataframe(df_admin, use_container_width=True)
+            st.dataframe(df_admin[["Status", "Audit_ID", "Surgeon", "Procedure", "Complexity_Score"]], use_container_width=True)
     else:
         st.info("No verified procedures logged in the system yet.")
