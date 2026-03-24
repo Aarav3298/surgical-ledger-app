@@ -118,62 +118,58 @@ if view == "Surgeon Portal":
 # PORTAL 2: ADMIN CONSOLE (The "Truth Engine")
 # ==========================================
 elif view == "Admin Console":
-    st.title("Talent Intelligence: Executive View")
-    st.markdown("Clinical Governance Dashboard: Objective, mathematically ranked operator performance.")
+    st.title("📊 Clinical Governance Executive Dashboard")
+    st.markdown("### Risk-Adjusted Surgical Optimization")
 
     if st.session_state.procedures:
         df_admin = pd.DataFrame(st.session_state.procedures)
         
-        # --- 1. CALCULATE THE CLINICAL IMPACT SCORE (CIS) ---
-        # Group the raw data by Surgeon
+        # --- 1. AGGREGATE DATA FOR SCORECARD ---
         agg_df = df_admin.groupby("Surgeon").agg(
             Total_Cases=("Procedure", "count"),
             Avg_ASI=("Complexity_Score", "mean"),
+            Avg_OT_Time=("OT Time", "mean")
         ).reset_index()
 
-        # Calculate Success Rate based on whether they logged "None" for Complications
         def calc_success_rate(surgeon_name):
             surgeon_cases = df_admin[df_admin["Surgeon"] == surgeon_name]
             total = len(surgeon_cases)
-            # Count cases where Complications is not "None"
             errors = len(surgeon_cases[surgeon_cases["Complications"].str.lower() != "none"])
             if total == 0: return 100.0
             return round(((total - errors) / total) * 100, 1)
 
         agg_df["Success_Rate_%"] = agg_df["Surgeon"].apply(calc_success_rate)
         
-        # Mock Efficiency Score (In production, this compares Actual OT to Benchmark OT)
-        agg_df["Avg_Efficiency_%"] = 94.5 
-        
-        # The Master Formula: CIS = (Cases * Avg ASI) * (Success Rate / 100)
+        # CIS Calculation
         agg_df["Clinical_Impact_Score"] = round(agg_df["Total_Cases"] * agg_df["Avg_ASI"] * (agg_df["Success_Rate_%"] / 100), 2)
-        
-        # Sort by the highest value creator
         agg_df = agg_df.sort_values(by="Clinical_Impact_Score", ascending=False)
-        
-        # Format the numbers to look clean on the dashboard
-        agg_df["Avg_ASI"] = agg_df["Avg_ASI"].round(2)
 
-        # --- 2. RENDER THE EXECUTIVE DASHBOARD ---
-        st.subheader("Leaderboard: Clinical Impact Score (CIS)")
-        # Reordering columns to match the old Module 3 exactly
-        display_columns = ["Surgeon", "Clinical_Impact_Score", "Total_Cases", "Avg_ASI", "Avg_Efficiency_%", "Success_Rate_%"]
-        st.dataframe(agg_df[display_columns], use_container_width=True, hide_index=True)
-        
+        # --- 2. SURGEON PERFORMANCE SCORECARD ---
+        st.subheader("Surgeon Performance Scorecard")
+        st.dataframe(agg_df[["Surgeon", "Clinical_Impact_Score", "Total_Cases", "Avg_ASI", "Success_Rate_%", "Avg_OT_Time"]], use_container_width=True, hide_index=True)
+
         st.divider()
-        
+
         col1, col2 = st.columns([2, 1])
-        
+
+        # --- 3. DEPARTMENTAL BENCHMARK MATRIX (ALTAIR CHART) ---
         with col1:
-            st.subheader("Raw Verified Ledger (Audit Ready)")
-            # Admins can see the exact Audit IDs to pull physical files
-            st.dataframe(df_admin[["Status", "Audit_ID", "Surgeon", "Procedure", "Complexity_Score", "Complications"]], use_container_width=True, hide_index=True)
+            st.subheader("Departmental Benchmark Matrix")
+            st.markdown("Visualizing operator Volume vs. Complexity.")
             
+            chart = alt.Chart(agg_df).mark_circle().encode(
+                x=alt.X('Total_Cases:Q', title='Volume (Total Cases)'),
+                y=alt.Y('Avg_ASI:Q', title='Complexity (Average ASI Score)', scale=alt.Scale(domain=[1, 5.5])),
+                size=alt.Size('Clinical_Impact_Score:Q', legend=None),
+                color=alt.Color('Success_Rate_%:Q', scale=alt.Scale(scheme='redyellowgreen'), title='Success Rate'),
+                tooltip=['Surgeon', 'Total_Cases', 'Avg_ASI', 'Clinical_Impact_Score', 'Success_Rate_%']
+            ).interactive()
+            
+            st.altair_chart(chart, use_container_width=True)
+
+        # --- 4. DATA EXPORT & AI CMO SUMMARY ---
         with col2:
             st.subheader("Data Export")
-            st.markdown("Download the full departmental CIS report for HR and Management review.")
-            
-            # The exact CSV export function from Module 3
             csv_data = agg_df.to_csv(index=False).encode('utf-8')
             st.download_button(
                 label="📥 Download CIS Report (CSV)",
@@ -182,5 +178,21 @@ elif view == "Admin Console":
                 mime='text/csv',
                 use_container_width=True
             )
+            
+            st.divider()
+            
+            st.subheader("AI CMO Summary")
+            st.markdown("Executive Analysis Engine")
+            if st.button("Generate Recommendation", use_container_width=True):
+                with st.spinner("Analyzing departmental data..."):
+                    prompt = f"""
+                    You are the Chief Medical Officer of a hospital. Analyze this data: {agg_df.to_dict('records')}
+                    Write a brutal, 2-sentence executive summary telling the hospital director exactly who is the most valuable surgeon (based on high CIS and Success Rate) and who is a liability. Be extremely concise.
+                    """
+                    try:
+                        cmo_response = model.generate_content(prompt)
+                        st.success(cmo_response.text)
+                    except Exception as e:
+                        st.error("AI analysis temporarily unavailable.")
     else:
-        st.info("No verified procedures logged in the system yet. The dashboard will populate once data is entered.")
+        st.info("No verified procedures logged in the system yet.")
