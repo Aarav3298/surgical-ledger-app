@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import google.generativeai as genai
+import altair as alt
 
 # --- PAGE CONFIG ---
 st.set_page_config(page_title="Surgical Intelligence Platform", layout="wide")
