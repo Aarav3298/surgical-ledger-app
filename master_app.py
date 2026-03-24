@@ -1,11 +1,10 @@
 import streamlit as st
 import pandas as pd
-# import google.generativeai as genai # We will activate this when we write the OCR function
 
 # --- PAGE CONFIG ---
 st.set_page_config(page_title="Surgical Intelligence Platform", layout="wide")
 
-# --- MOCK DATABASE (To test the UI before we connect a real database) ---
+# --- MOCK DATABASE ---
 if "procedures" not in st.session_state:
     st.session_state.procedures = []
 
@@ -17,43 +16,48 @@ view = st.sidebar.radio("Select Portal:", ["Surgeon Portal", "Admin Console"])
 # PORTAL 1: SURGEON VIEW (The "Verified Resume")
 # ==========================================
 if view == "Surgeon Portal":
-    st.title("Surgeon Portal: Verified Log")
-    st.markdown("Upload hospital invoices to securely log verified procedures.")
+    st.title("Surgeon Portal: Log Procedure")
+    st.markdown("Enter procedure details and upload the billing invoice for verification.")
 
     with st.form("log_procedure_form"):
-        st.subheader("1. Upload Proof")
-        # THE HARD MOAT: Replaced the manual text box with a File Uploader
-        uploaded_file = st.file_uploader("Upload TPA Claim / Hospital Invoice (PDF or Image)", type=["pdf", "png", "jpg", "jpeg"])
+        st.subheader("1. Mandatory Proof")
+        # The file uploader is just for attachment/audit purposes now
+        uploaded_file = st.file_uploader("Attach Hospital Invoice / Claim PDF (Required for Verification)", type=["pdf", "png", "jpg"])
         
-        st.subheader("2. Procedure Details")
+        st.subheader("2. Clinical Details")
         col1, col2 = st.columns(2)
         with col1:
             surgeon_name = st.text_input("Primary Surgeon Name")
             procedure_name = st.text_input("Procedure Performed")
+            audit_id = st.text_input("Invoice / Claim ID (Type manually)")
         with col2:
             date_performed = st.date_input("Date of Procedure")
-            clinical_notes = st.text_area("Brief Clinical Context (Optional)")
+            comorbidities = st.multiselect("Patient Comorbidities (Select all that apply)", 
+                                           ["None", "Diabetes", "Hypertension", "Obesity", "Cardiac Disease", "Renal Issue"])
+            complications = st.text_area("Intra-op Complications / Blood Loss (If any)")
 
-        submit_button = st.form_submit_button(label="Extract & Verify Procedure")
+        submit_button = st.form_submit_button(label="Log & Verify Procedure")
 
     if submit_button:
-        if uploaded_file is not None and surgeon_name and procedure_name:
-            # Placeholder for our future Gemini Vision AI extraction logic
-            st.info("Scanning document and extracting Invoice ID...")
+        # The system forces them to upload a file AND enter the manual ID
+        if uploaded_file is not None and surgeon_name and procedure_name and audit_id:
             
-            # Mocking a successful AI extraction and verification
+            # Placeholder for the Gemini API that will read these text fields and return a score
+            mock_complexity_score = 4 
+            
             new_entry = {
                 "Surgeon": surgeon_name,
                 "Procedure": procedure_name,
                 "Date": date_performed,
-                "Complexity_Score": 4, # Mock score that AI will generate later
-                "Verification_Status": "VERIFIED (ID: HOS-88921)",
-                "Notes": clinical_notes
+                "Comorbidities": ", ".join(comorbidities) if comorbidities else "None",
+                "Complexity_Score": mock_complexity_score,
+                "Audit_ID": audit_id,
+                "Proof_Attached": "Yes"
             }
             st.session_state.procedures.append(new_entry)
-            st.success("Procedure Verified & Logged! Patient data scrubbed.")
+            st.success(f"Procedure Logged! Linked to Audit ID: {audit_id}")
         else:
-            st.error("Please upload a billing document and fill out the mandatory fields.")
+            st.error("Submission Failed: You must attach the PDF proof and fill out all mandatory fields.")
 
     # Show the Surgeon's current verified stats
     if st.session_state.procedures:
@@ -72,16 +76,19 @@ elif view == "Admin Console":
     if st.session_state.procedures:
         df_admin = pd.DataFrame(st.session_state.procedures)
         
-        # Calculate Mock Stack Rank
-        st.subheader("Operator Stack Rank (By Verified Complexity)")
-        rankings = df_admin.groupby("Surgeon")["Complexity_Score"].sum().reset_index()
-        rankings = rankings.sort_values(by="Complexity_Score", ascending=False)
-        rankings.columns = ["Surgeon", "Total Verified Complexity Output"]
+        col1, col2 = st.columns([1, 2])
         
-        st.dataframe(rankings, use_container_width=True)
-        
-        st.divider()
-        st.subheader("Raw Verified Ledger")
-        st.dataframe(df_admin, use_container_width=True)
+        with col1:
+            # Calculate Stack Rank
+            st.subheader("Operator Stack Rank")
+            rankings = df_admin.groupby("Surgeon")["Complexity_Score"].sum().reset_index()
+            rankings = rankings.sort_values(by="Complexity_Score", ascending=False)
+            rankings.columns = ["Surgeon", "Total Verified Complexity"]
+            st.dataframe(rankings, use_container_width=True)
+            
+        with col2:
+            st.subheader("Raw Verified Ledger (Ready for Audit)")
+            # Admins can see the exact Audit IDs to pull the physical files if they suspect cheating
+            st.dataframe(df_admin, use_container_width=True)
     else:
-        st.info("No verified procedures logged in the system yet. Waiting for surgeon inputs.")
+        st.info("No verified procedures logged in the system yet.")
