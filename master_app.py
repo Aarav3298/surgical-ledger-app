@@ -117,23 +117,69 @@ if view == "Surgeon Portal":
 # PORTAL 2: ADMIN CONSOLE (The "Truth Engine")
 # ==========================================
 elif view == "Admin Console":
-    st.title("Admin Console: Talent Intelligence")
-    st.markdown("Objective, mathematically ranked operator performance based on verified billing data.")
+    st.title("Talent Intelligence: Executive View")
+    st.markdown("Clinical Governance Dashboard: Objective, mathematically ranked operator performance.")
 
     if st.session_state.procedures:
         df_admin = pd.DataFrame(st.session_state.procedures)
         
-        col1, col2 = st.columns([1, 2])
+        # --- 1. CALCULATE THE CLINICAL IMPACT SCORE (CIS) ---
+        # Group the raw data by Surgeon
+        agg_df = df_admin.groupby("Surgeon").agg(
+            Total_Cases=("Procedure", "count"),
+            Avg_ASI=("Complexity_Score", "mean"),
+        ).reset_index()
+
+        # Calculate Success Rate based on whether they logged "None" for Complications
+        def calc_success_rate(surgeon_name):
+            surgeon_cases = df_admin[df_admin["Surgeon"] == surgeon_name]
+            total = len(surgeon_cases)
+            # Count cases where Complications is not "None"
+            errors = len(surgeon_cases[surgeon_cases["Complications"].str.lower() != "none"])
+            if total == 0: return 100.0
+            return round(((total - errors) / total) * 100, 1)
+
+        agg_df["Success_Rate_%"] = agg_df["Surgeon"].apply(calc_success_rate)
+        
+        # Mock Efficiency Score (In production, this compares Actual OT to Benchmark OT)
+        agg_df["Avg_Efficiency_%"] = 94.5 
+        
+        # The Master Formula: CIS = (Cases * Avg ASI) * (Success Rate / 100)
+        agg_df["Clinical_Impact_Score"] = round(agg_df["Total_Cases"] * agg_df["Avg_ASI"] * (agg_df["Success_Rate_%"] / 100), 2)
+        
+        # Sort by the highest value creator
+        agg_df = agg_df.sort_values(by="Clinical_Impact_Score", ascending=False)
+        
+        # Format the numbers to look clean on the dashboard
+        agg_df["Avg_ASI"] = agg_df["Avg_ASI"].round(2)
+
+        # --- 2. RENDER THE EXECUTIVE DASHBOARD ---
+        st.subheader("Leaderboard: Clinical Impact Score (CIS)")
+        # Reordering columns to match the old Module 3 exactly
+        display_columns = ["Surgeon", "Clinical_Impact_Score", "Total_Cases", "Avg_ASI", "Avg_Efficiency_%", "Success_Rate_%"]
+        st.dataframe(agg_df[display_columns], use_container_width=True, hide_index=True)
+        
+        st.divider()
+        
+        col1, col2 = st.columns([2, 1])
         
         with col1:
-            st.subheader("Operator Stack Rank")
-            rankings = df_admin.groupby("Surgeon")["Complexity_Score"].sum().reset_index()
-            rankings = rankings.sort_values(by="Complexity_Score", ascending=False)
-            rankings.columns = ["Surgeon", "Total Verified Complexity"]
-            st.dataframe(rankings, use_container_width=True)
+            st.subheader("Raw Verified Ledger (Audit Ready)")
+            # Admins can see the exact Audit IDs to pull physical files
+            st.dataframe(df_admin[["Status", "Audit_ID", "Surgeon", "Procedure", "Complexity_Score", "Complications"]], use_container_width=True, hide_index=True)
             
         with col2:
-            st.subheader("Raw Verified Ledger (Ready for Audit)")
-            st.dataframe(df_admin[["Status", "Audit_ID", "Surgeon", "Procedure", "Complexity_Score"]], use_container_width=True)
+            st.subheader("Data Export")
+            st.markdown("Download the full departmental CIS report for HR and Management review.")
+            
+            # The exact CSV export function from Module 3
+            csv_data = agg_df.to_csv(index=False).encode('utf-8')
+            st.download_button(
+                label="📥 Download CIS Report (CSV)",
+                data=csv_data,
+                file_name='hospital_cis_report.csv',
+                mime='text/csv',
+                use_container_width=True
+            )
     else:
-        st.info("No verified procedures logged in the system yet.")
+        st.info("No verified procedures logged in the system yet. The dashboard will populate once data is entered.")
